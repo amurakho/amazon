@@ -29,6 +29,14 @@ class AmazonProductSpider(scrapy.Spider):
     }
     settings = get_project_settings()
 
+    default_stars = {
+        'one_star': 1,
+        'two_star': 2,
+        'three_star': 3,
+        'four_star': 4,
+        'five_star': 5,
+    }
+
     def __init__(self, *args, **kwargs):
         super(AmazonProductSpider, self).__init__(*args, **kwargs)
 
@@ -56,7 +64,7 @@ class AmazonProductSpider(scrapy.Spider):
         error_text = response.xpath('//p[@class="a-last"]/text()').get()
         if error_text == "Sorry, we just need to make sure you're not a robot. " \
                          "For best results, please make sure your browser is accepting cookies.":
-            time.sleep(15)
+            # time.sleep(15)
             user_agent = random.choice(self.settings.get('USER_AGENTS'))
             yield scrapy.Request(url=response.url, callback=self.parse_page_result,
                                  headers={'User-Agent': user_agent},
@@ -98,7 +106,7 @@ class AmazonProductSpider(scrapy.Spider):
                                                                                 },
                                      dont_filter=True)
             # pagination
-            if response.css('.a-last').get():
+            if response.xpath('//li[@class="a-last"]').get():
                 page += 1
                 url = 'https://www.amazon.in/s?k={}&page={}'.format(response.meta.get('keyword'), page)
                 yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
@@ -109,10 +117,8 @@ class AmazonProductSpider(scrapy.Spider):
     def get_review(self, response):
         # get reviews
         item = []
-        # blocks = response.xpath('//span[@data-hook="review-body"]')[:5]
         blocks = response.css('.review-text-content span')[:5]
         dates = response.css('#cm_cr-review_list .review-date')[:5]
-        # dates = response.xpath('//span[@data-hook="review-date"]')[:5]
         for block, date in zip(blocks, dates):
             rewiev = {
                 'date': date.css('::text').get(),
@@ -127,7 +133,7 @@ class AmazonProductSpider(scrapy.Spider):
         error_text = response.xpath('//p[@class="a-last"]/text()').get()
         if error_text == "Sorry, we just need to make sure you're not a robot. " \
                          "For best results, please make sure your browser is accepting cookies.":
-            time.sleep(15)
+            # time.sleep(15)
             user_agent = random.choice(self.settings.get('USER_AGENTS'))
             yield scrapy.Request(url=response.url, callback=self.parse_product,
                                  headers={'User-Agent': user_agent},
@@ -140,7 +146,10 @@ class AmazonProductSpider(scrapy.Spider):
             item['url'] = url[:url.find('/ref') + 1]
             item['price'] = response.xpath('//span[@id="priceblock_dealprice"]//text()').get()
             if not item['price']:
-                item['price'] = response.xpath('//span[@id="priceblock_ourprice"]//text()').get()
+                item['price'] = response.css('#priceblock_ourprice::text').get()
+            if not item['price']:
+                price_block = response.xpath('//fieldset[@class="forScreenreaders"]//li/@data-p13n-asin-metadata').get()
+                item['price'] = json.loads(price_block)['price']
             item['is_freedelivery'] = response.meta.get('freedelivery')
             item['asin'] = response.meta.get('asin')
             item['stars'] = response.xpath('//div[@id="averageCustomerReviews_feature_div"]'
@@ -152,6 +161,7 @@ class AmazonProductSpider(scrapy.Spider):
             item['keyword'] = response.meta.get('keyword')
             item['reviews'] = response.xpath('//span[@id="acrCustomerReviewText"]/text()').get()
             item['image'] = response.xpath('//div[@id="imgTagWrapperId"]/img/@data-a-dynamic-image').get()
+            item['top_100'] = False
             if response.css('.ac-badge-wrapper'):
                 item['is_amazonchoice'] = True
             else:
@@ -166,18 +176,23 @@ class AmazonProductSpider(scrapy.Spider):
                     item['product_rank'] = table[1].xpath(
                         '//td[contains(text(), "Amazon Bestsellers Rank")]/following::node()[1]'
                         '//text()').getall()
+            else:
+                item['product_rank'] = response.xpath('//li[@id="SalesRank"]/text()').get()
+            item['seller'] = response.xpath('//a[@id="sellerProfileTriggerId"]/text()').get()
+            if not item['seller']:
+                item['seller'] = 'Amazon'
             # get the links of reviews page and send requests
             table = response.xpath('//td[@class="aok-nowrap"]//@href').getall()
             item['top5_rewiews'] = []
             for idx, elem in enumerate(table):
+                for default_star in self.default_stars:
+                    if default_star in elem:
+                        url_star = default_star
                 url = self.base_url + elem
                 res = yield scrapy.Request(url=url)
                 item['top5_rewiews'].append(
-                    {5 - idx: self.get_review(res)}
+                    {self.default_stars[url_star]: self.get_review(res)}
                 )
 
-            item['seller'] = response.xpath('//a[@id="sellerProfileTriggerId"]/text()').get()
-            if not item['seller']:
-                item['seller'] = 'Amazon'
 
             yield item

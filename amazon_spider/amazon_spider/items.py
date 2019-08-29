@@ -29,6 +29,7 @@ class AmazonProductItem(scrapy.Item):
     sponsored_page = scrapy.Field()
     sponsored_pos = scrapy.Field()
     asin = scrapy.Field()
+    top_100 = scrapy.Field()
 
 class AmazonCategory(scrapy.Item):
     name = scrapy.Field()

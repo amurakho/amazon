@@ -28,6 +28,10 @@ class AmazonProductPipeline(ImagesPipeline):
             item['is_prime'] = False
         if not item.get('sponsored'):
             item['sponsored'] = False
+        if not item.get('sponsored_pos'):
+            item['sponsored_pos'] = False
+        if not item.get('sponsored_page'):
+            item['sponsored_page'] = False
         # If you want add new function for data edding
         # Example:
         # if item.get('FIELD WHICH YOU NEED TO EDIT'):
@@ -100,6 +104,7 @@ class AmazonProductDump(object):
         Here i create the table
         and dump the data into base
         """
+        # add top_100 field (bool)
         self.curr.execute(
             """
             CREATE TABLE IF NOT EXISTS demodb(
@@ -120,7 +125,8 @@ class AmazonProductDump(object):
                 is_sponsored text,
                 sponsored_pos text,
                 sponsored_page text,
-                keyword text
+                keyword text,
+                top_100 text
             )
             """
         )
@@ -143,8 +149,10 @@ class AmazonProductDump(object):
             row = self.curr.fetchone()
             if row:
                 return
+            # add top_100 field (bool)
+
             self.curr.execute(
-                """INSERT INTO demodb values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", (
+                """INSERT INTO demodb values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", (
                     item['asin'],
                     item['name'],
                     item['description'],
@@ -162,6 +170,7 @@ class AmazonProductDump(object):
                     item['sponsored'],
                     item['sponsored_pos'],
                     item['sponsored_page'],
-                    item['keyword']
+                    item['keyword'],
+                    item['top_100'],
             ))
             self.conn.commit()
