@@ -3,19 +3,15 @@ import scrapy
 from ..items import AmazonProductItem
 import time
 from inline_requests import inline_requests
-from scrapy.utils.project import get_project_settings
 import random
 import json
 
-class AmazonProductSpider(scrapy.Spider):
-    name = 'amazon_product'
+class AmazonTop100Spider(scrapy.Spider):
+    name = 'amazon_top100'
     allowed_domains = ['amazon.in']
+    start_urls = []
 
     base_url = 'https://www.amazon.in'
-
-    start_urls = [
-        'https://www.example.com'
-    ]
 
     custom_settings = {
         'ITEM_PIPELINES': {
@@ -25,11 +21,8 @@ class AmazonProductSpider(scrapy.Spider):
         },
         # this is delays between requests(in sec).
         # If you want get faster, you can change it, but it is on your own risk
-
-        # Write now i know, that you can make delay to 0.5 sec!! So it will be faster
         'DOWNLOAD_DELAY': 0.5,
     }
-    settings = get_project_settings()
 
     default_stars = {
         'one_star': 1,
@@ -40,83 +33,49 @@ class AmazonProductSpider(scrapy.Spider):
     }
 
     def __init__(self, *args, **kwargs):
-        super(AmazonProductSpider, self).__init__(*args, **kwargs)
+        super(AmazonTop100Spider, self).__init__(*args, **kwargs)
 
-        self.keyword = kwargs.get('keyword', None)
         self.image_manage = kwargs.get('image', 'link')
 
-    def parse(self, response):
-        # # For test!
-        # url = 'https://www.amazon.in/Rich-Dad-Poor-Middle-Updates/dp/1612680194/'
+    def start_requests(self):
+        # url = 'https://www.amazon.in/Fashion-Digital-Black-Colour-Watch/dp/B07V1P3Z95/'
         # yield scrapy.Request(url=url, callback=self.parse_product, meta={
-        #     'page': 1,
-        #     'keyword': self.keyword
-        # })
-
-        # next we create the request for our keyword
-        if self.keyword:
-            searching_url = 'https://www.amazon.in/s?k={}'
-            url = searching_url.format(self.keyword)
-            yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
-                                                                                'page': 1,
-                                                                                 'keyword': self.keyword
-                                                                                 })
+        #             'page': 1,
+        #         })
+        with open('cat.csv') as file:
+            for idx, url in enumerate(file.readlines()):
+                if idx < 2:
+                    continue
+                yield scrapy.Request(url=url, callback=self.parse_page_result)
+                break
 
     def parse_page_result(self, response):
-
         # check the captcha
         error_text = response.xpath('//p[@class="a-last"]/text()').get()
         if error_text == "Sorry, we just need to make sure you're not a robot. " \
                          "For best results, please make sure your browser is accepting cookies.":
-            # time.sleep(15)
+            # time.sleep(10)
             user_agent = random.choice(self.settings.get('USER_AGENTS'))
             yield scrapy.Request(url=response.url, callback=self.parse_page_result,
                                  headers={'User-Agent': user_agent},
                                  dont_filter=True, meta=response.meta)
+
         else:
-            # we take all results from page
-            blocks = response.css('.s-result-item')
-            page = response.meta.get('page')
-            # passing all blocks, get the info, and pass request to the product page
+            blocks = response.css('.zg-item')
             for block in blocks:
-                asin = block.xpath('@data-asin').get()
-                if not asin:
-                    continue
-                if block.css('.a-spacing-micro .a-color-secondary').get():
-                    sponsored = True
-                    page_number = page
-                    position = block.xpath('@data-index').get()
-                else:
-                    sponsored = False
-                    page_number = None
-                    position = None
-                if block.css('.s-prime .a-icon-medium').get():
+                if block.css('.a-icon-small').get():
                     isprime = True
                 else:
                     isprime = False
-                if block.css('.s-align-children-center .s-align-children-center+ .a-row span').get():
-                    freedelivery = True
-                else:
-                    freedelivery = False
-                url = self.base_url + block.css('.a-size-mini a::attr(href)').get()
-                yield scrapy.Request(url, callback=self.parse_product, meta={
-                                                                            'sponsored': sponsored,
-                                                                            'isprime': isprime,
-                                                                            'freedelivery': freedelivery,
-                                                                            'page_number': page_number,
-                                                                            'position': position,
-                                                                            'asin': asin,
-                                                                            'keyword': response.meta.get('keyword'),
-                                                                                },
-                                     dont_filter=True)
-            # pagination
+                url = self.base_url + block.css('.a-link-normal::attr(href)').get()
+                yield scrapy.Request(url=url, callback=self.parse_product, meta={
+                    'isprime': isprime,
+                })
             if response.xpath('//li[@class="a-last"]').get():
-                page += 1
-                url = 'https://www.amazon.in/s?k={}&page={}'.format(response.meta.get('keyword'), page)
+                url = response.url + '&pg=2'
                 yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
-                                                                                    'keyword': response.meta.get('keyword'),
-                                                                                    'page': page
-                                                                                    })
+                    'keyword': response.meta.get('keyword'),
+                })
 
     def get_review(self, response):
         # get reviews
@@ -137,7 +96,8 @@ class AmazonProductSpider(scrapy.Spider):
         error_text = response.xpath('//p[@class="a-last"]/text()').get()
         if error_text == "Sorry, we just need to make sure you're not a robot. " \
                          "For best results, please make sure your browser is accepting cookies.":
-            # time.sleep(15)
+            # print('error')
+            # time.sleep(10)
             user_agent = random.choice(self.settings.get('USER_AGENTS'))
             yield scrapy.Request(url=response.url, callback=self.parse_product,
                                  headers={'User-Agent': user_agent},
@@ -161,20 +121,24 @@ class AmazonProductSpider(scrapy.Spider):
                     item['price'] = json.loads(price_block)['price']
             if not item['price']:
                 item['price'] = response.css('.price3P::text').get()
-            item['is_freedelivery'] = response.meta.get('freedelivery')
-            item['asin'] = response.meta.get('asin')
+            item['asin'] = url[url.find('/dp/') + 4:url.find('/ref')]
+            if not item['price']:
+                item['price'] = response.css('#priceblock_ourprice::text').get()
+            if not item['price']:
+                price_block = response.xpath('//fieldset[@class="forScreenreaders"]//li/@data-p13n-asin-metadata').get()
+                item['price'] = json.loads(price_block)['price']
+            delivery = response.css('#price-shipping-message b::text').get()
+            if delivery == 'FREE Delivery':
+                item['is_freedelivery'] = True
+            else:
+                item['is_freedelivery'] = False
             item['stars'] = response.xpath('//div[@id="averageCustomerReviews_feature_div"]'
                                            '//span[@id="acrPopover"]/@title').get()
-            item['sponsored'] = response.meta.get('sponsored')
-            item['sponsored_page'] = response.meta.get('page_number')
-            item['sponsored_pos'] = response.meta.get('position')
             item['is_prime'] = response.meta.get('isprime')
             item['keyword'] = response.meta.get('keyword')
             item['reviews'] = response.xpath('//span[@id="acrCustomerReviewText"]/text()').get()
             item['image'] = response.xpath('//div[@id="imgTagWrapperId"]/img/@data-a-dynamic-image').get()
-            if not item['image']:
-                item['image'] = response.xpath('//img[@id="imgBlkFront"]//@data-a-dynamic-image').get()
-            item['top_100'] = False
+            item['top_100'] = True
             if response.css('.ac-badge-wrapper'):
                 item['is_amazonchoice'] = True
             else:
@@ -182,16 +146,17 @@ class AmazonProductSpider(scrapy.Spider):
 
             table = response.css('.attrG')
             if table:
-                item['product_rank'] = table[0].xpath('//td[contains(text(), "Amazon Bestsellers Rank")]/following::node()[1]'
-                                                   '//text()').getall()
+                item['product_rank'] = table[0].xpath(
+                    '//td[contains(text(), "Amazon Bestsellers Rank")]/following::node()[1]'
+                    '//text()').getall()
                 if not item['product_rank']:
                     table = response.css('.attrG')
                     item['product_rank'] = table[1].xpath(
                         '//td[contains(text(), "Amazon Bestsellers Rank")]/following::node()[1]'
                         '//text()').getall()
             else:
-                item['product_rank'] = response.xpath('//li[@id="SalesRank"]/text()').getall()
-                item['product_rank'].extend(response.xpath('//li[@id="SalesRank"]/ul//text()').getall())
+                    item['product_rank'] = response.xpath('//li[@id="SalesRank"]/text()').getall()
+                    item['product_rank'].extend(response.xpath('//li[@id="SalesRank"]/ul//text()').getall())
             item['seller'] = response.xpath('//a[@id="sellerProfileTriggerId"]/text()').get()
             if not item['seller']:
                 item['seller'] = 'Amazon'
