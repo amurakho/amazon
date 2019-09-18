@@ -8,10 +8,13 @@ from scrapy.pipelines.images import ImagesPipeline
 import scrapy
 import mysql.connector
 import json
+import re
 
 
 class AmazonProductPipeline(ImagesPipeline):
     def process_item(self, item, spider):
+        if item.get('price'):
+            item['price'] = self.parse_price(item['price'])
         if item.get('name'):
             item['name'] = item.get('name').strip()
         if item.get('description'):
@@ -40,6 +43,10 @@ class AmazonProductPipeline(ImagesPipeline):
 
     # def COSTOM_FUNC(self, ...):
     #   pass
+    def parse_price(self, item):
+        item = item[2:]
+        item = item.replace(',', '')
+        return float(item)
 
     def parse_image(self, item):
         item = dict(json.loads(item))
@@ -107,12 +114,17 @@ class AmazonProductDump(object):
         # add top_100 field (bool)
         self.curr.execute(
             """
+            DROP TABLE demodb
+            """
+        )
+        self.curr.execute(
+            """
             CREATE TABLE IF NOT EXISTS demodb(
-                asin text,
+                asin VARCHAR(20) PRIMARY KEY,
                 product_name text,
                 descriprion text,
                 url text,
-                price text,
+                price float,
                 image_url text,
                 product_review_stars text,
                 seller text,

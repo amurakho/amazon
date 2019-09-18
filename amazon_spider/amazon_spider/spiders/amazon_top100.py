@@ -7,6 +7,17 @@ import random
 import json
 
 class AmazonTop100Spider(scrapy.Spider):
+    """
+    KEYWORDS:
+        image=""    -   download image or only save the link
+                        by default this keyword have "link"
+                        parameter which mean, that scrapper
+                        will be only save the link, and if
+                        you want turn on download option you,
+                        schould change that keyword to anyone
+                        except "link": expample -a image="asd"
+
+    """
     name = 'amazon_top100'
     allowed_domains = ['amazon.in']
     start_urls = []

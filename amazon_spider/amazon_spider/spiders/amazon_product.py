@@ -8,6 +8,21 @@ import random
 import json
 
 class AmazonProductSpider(scrapy.Spider):
+    """
+    KEYWORDS:
+        keyword=""  -   which product you want to scrape
+
+        image=""    -   download image or only save the link
+                        by default this keyword have "link"
+                        parameter which mean, that scrapper
+                        will be only save the link, and if
+                        you want turn on download option you,
+                        schould change that keyword to anyone
+                        except "link": expample -a image="asd"
+
+        pages=""    -   max count of page, what you want to scrape
+
+    """
     name = 'amazon_product'
     allowed_domains = ['amazon.in']
 
@@ -44,23 +59,24 @@ class AmazonProductSpider(scrapy.Spider):
 
         self.keyword = kwargs.get('keyword', None)
         self.image_manage = kwargs.get('image', 'link')
+        self.max_pages = kwargs.get('pages', None)
 
     def parse(self, response):
-        # # For test!
-        # url = 'https://www.amazon.in/Rich-Dad-Poor-Middle-Updates/dp/1612680194/'
-        # yield scrapy.Request(url=url, callback=self.parse_product, meta={
-        #     'page': 1,
-        #     'keyword': self.keyword
-        # })
+        # For test!
+        url = 'https://www.amazon.in/HP-Chromebook-Touchscreen-180-degree-14-ca002TU/dp/B07QNM5LZ5/'
+        yield scrapy.Request(url=url, callback=self.parse_product, meta={
+            'page': 1,
+            'keyword': self.keyword
+        })
 
-        # next we create the request for our keyword
-        if self.keyword:
-            searching_url = 'https://www.amazon.in/s?k={}'
-            url = searching_url.format(self.keyword)
-            yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
-                                                                                'page': 1,
-                                                                                 'keyword': self.keyword
-                                                                                 })
+        # # next we create the request for our keyword
+        # if self.keyword:
+        #     searching_url = 'https://www.amazon.in/s?k={}'
+        #     url = searching_url.format(self.keyword)
+        #     yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
+        #                                                                         'page': 1,
+        #                                                                          'keyword': self.keyword
+        #                                                                          })
 
     def parse_page_result(self, response):
 
@@ -110,7 +126,7 @@ class AmazonProductSpider(scrapy.Spider):
                                                                                 },
                                      dont_filter=True)
             # pagination
-            if response.xpath('//li[@class="a-last"]').get():
+            if response.xpath('//li[@class="a-last"]').get() and page != self.max_pages:
                 page += 1
                 url = 'https://www.amazon.in/s?k={}&page={}'.format(response.meta.get('keyword'), page)
                 yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
