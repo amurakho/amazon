@@ -57,26 +57,27 @@ class AmazonProductSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super(AmazonProductSpider, self).__init__(*args, **kwargs)
 
-        self.keyword = kwargs.get('keyword', None)
+        keywords = kwargs.get('keyword', None)
+        self.keywords = keywords.split(',')
         self.image_manage = kwargs.get('image', 'link')
         self.max_pages = kwargs.get('pages', None)
 
     def parse(self, response):
-        # For test!
-        url = 'https://www.amazon.in/HP-Chromebook-Touchscreen-180-degree-14-ca002TU/dp/B07QNM5LZ5/'
-        yield scrapy.Request(url=url, callback=self.parse_product, meta={
-            'page': 1,
-            'keyword': self.keyword
-        })
+        # # For test!
+        # url = 'https://www.amazon.in/HP-Chromebook-Touchscreen-180-degree-14-ca002TU/dp/B07QNM5LZ5/'
+        # yield scrapy.Request(url=url, callback=self.parse_product, meta={
+        #     'page': 1,
+        #     'keyword': self.keyword
+        # })
 
-        # # next we create the request for our keyword
-        # if self.keyword:
-        #     searching_url = 'https://www.amazon.in/s?k={}'
-        #     url = searching_url.format(self.keyword)
-        #     yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
-        #                                                                         'page': 1,
-        #                                                                          'keyword': self.keyword
-        #                                                                          })
+        # next we create the request for our keyword
+        for keyword in self.keywords:
+            searching_url = 'https://www.amazon.in/s?k={}'
+            url = searching_url.format(keyword)
+            yield scrapy.Request(url=url, callback=self.parse_page_result, meta={
+                                                                                'page': 1,
+                                                                                 'keyword': keyword
+                                                                                 })
 
     def parse_page_result(self, response):
 
