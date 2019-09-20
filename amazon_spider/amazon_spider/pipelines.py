@@ -8,7 +8,7 @@ from scrapy.pipelines.images import ImagesPipeline
 import scrapy
 import mysql.connector
 import json
-import re
+from datetime import datetime
 
 
 class AmazonProductPipeline(ImagesPipeline):
@@ -23,6 +23,8 @@ class AmazonProductPipeline(ImagesPipeline):
             item['product_rank'] = self.parse_product_rank(item.get('product_rank'))
         if item.get('image'):
             item['image'] = self.parse_image(item.get('image'))
+        if item.get('top5_rewiews'):
+            item['top5_rewiews'] = self.parse_top5(item.get('top5_rewiews'))
         if not item.get('is_freedelivery'):
             item['is_freedelivery'] = False
         if not item.get('is_amazonchoice'):
@@ -48,6 +50,14 @@ class AmazonProductPipeline(ImagesPipeline):
         item = item.replace(',', '')
         return float(item)
 
+    def parse_top5(self, item):
+        for star_rew in item:
+            star_rew = star_rew.values()
+            for rew in star_rew:
+                for elem in rew:
+                    elem['text'] = elem['text'].replace('\n', ' ')
+        return item
+
     def parse_image(self, item):
         item = dict(json.loads(item))
         return list(item.keys())[0]
@@ -55,6 +65,7 @@ class AmazonProductPipeline(ImagesPipeline):
     def parse_desc(self, item):
         item = ''.join(item)
         item = item.replace('\t', '')
+        item = item.replace('\n', ' ')
         return item
 
     def parse_product_rank(self, item):
@@ -111,16 +122,11 @@ class AmazonProductDump(object):
         Here i create the table
         and dump the data into base
         """
-        # add top_100 field (bool)
-        self.curr.execute(
-            """
-            DROP TABLE demodb
-            """
-        )
         self.curr.execute(
             """
             CREATE TABLE IF NOT EXISTS demodb(
-                asin VARCHAR(20) PRIMARY KEY,
+                move_id INT(10) AUTO_INCREMENT,
+                asin VARCHAR(20),
                 product_name text,
                 descriprion text,
                 url text,
@@ -138,7 +144,9 @@ class AmazonProductDump(object):
                 sponsored_pos text,
                 sponsored_page text,
                 keyword text,
-                top_100 text
+                top_100 text,
+                adding_date timestamp,
+                PRIMARY KEY(move_id)    
             )
             """
         )
@@ -161,10 +169,12 @@ class AmazonProductDump(object):
             row = self.curr.fetchone()
             if row:
                 return
-            # add top_100 field (bool)
-
             self.curr.execute(
-                """INSERT INTO demodb values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", (
+                """INSERT INTO demodb(asin,product_name,descriprion,url,price,image_url,product_review_stars,seller,
+                                        reviews,is_prime,is_amazonchoice,if_freedelivery,product_rank,top5_reviews,
+                                        is_sponsored,sponsored_pos,sponsored_page,keyword,top_100,adding_date) 
+                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
                     item['asin'],
                     item['name'],
                     item['description'],
@@ -184,5 +194,6 @@ class AmazonProductDump(object):
                     item['sponsored_page'],
                     item['keyword'],
                     item['top_100'],
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ))
             self.conn.commit()

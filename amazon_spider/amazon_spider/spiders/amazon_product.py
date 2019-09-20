@@ -58,7 +58,8 @@ class AmazonProductSpider(scrapy.Spider):
         super(AmazonProductSpider, self).__init__(*args, **kwargs)
 
         keywords = kwargs.get('keyword', None)
-        self.keywords = keywords.split(',')
+        if keywords:
+            self.keywords = keywords.split(',')
         self.image_manage = kwargs.get('image', 'link')
         self.max_pages = kwargs.get('pages', None)
 
@@ -67,7 +68,7 @@ class AmazonProductSpider(scrapy.Spider):
         # url = 'https://www.amazon.in/HP-Chromebook-Touchscreen-180-degree-14-ca002TU/dp/B07QNM5LZ5/'
         # yield scrapy.Request(url=url, callback=self.parse_product, meta={
         #     'page': 1,
-        #     'keyword': self.keyword
+        #     'keyword': 'TEST'
         # })
 
         # next we create the request for our keyword
