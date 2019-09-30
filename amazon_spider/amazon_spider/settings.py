@@ -64,3 +64,10 @@ ROTATED_PROXY_ENABLED = False
 # HTTPS_PROXIES = [
 #     'https://user:pass@proxy1:8888',
 # ]
+
+DB_SETTINGS = {
+    'host': 'localhost',
+    'user': 'demouser',
+    'passwd': 'demopassword',
+    'database': 'demodb'
+}

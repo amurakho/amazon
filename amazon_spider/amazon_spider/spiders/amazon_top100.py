@@ -46,6 +46,7 @@ class AmazonTop100Spider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super(AmazonTop100Spider, self).__init__(*args, **kwargs)
 
+        self.with_rewiews = kwargs.get('reviews', None)
         self.image_manage = kwargs.get('image', 'link')
 
     def start_requests(self):
@@ -115,7 +116,7 @@ class AmazonTop100Spider(scrapy.Spider):
                                  dont_filter=True, meta=response.meta)
         else:
             item = AmazonProductItem()
-            item['name'] = response.xpath('//span[@id="productTitle"]/text()').get()
+            item['title'] = response.xpath('//span[@id="productTitle"]/text()').get()
             item['description'] = response.xpath('//*[@id="feature-bullets"]//li//text()').getall()
             if not item['description']:
                 item['description'] = response.xpath('//div[@id="bookDescription_feature_div"]/noscript/div/text()').getall()
@@ -140,12 +141,12 @@ class AmazonTop100Spider(scrapy.Spider):
                 item['price'] = json.loads(price_block)['price']
             delivery = response.css('#price-shipping-message b::text').get()
             if delivery == 'FREE Delivery':
-                item['is_freedelivery'] = True
+                item['free_delivery'] = True
             else:
-                item['is_freedelivery'] = False
+                item['free_delivery'] = False
             item['stars'] = response.xpath('//div[@id="averageCustomerReviews_feature_div"]'
                                            '//span[@id="acrPopover"]/@title').get()
-            item['is_prime'] = response.meta.get('isprime')
+            item['prime'] = response.meta.get('isprime')
             item['keyword'] = response.meta.get('keyword')
             item['reviews'] = response.xpath('//span[@id="acrCustomerReviewText"]/text()').get()
             item['image'] = response.xpath('//div[@id="imgTagWrapperId"]/img/@data-a-dynamic-image').get()
@@ -174,13 +175,14 @@ class AmazonTop100Spider(scrapy.Spider):
             # get the links of reviews page and send requests
             table = response.xpath('//td[@class="aok-nowrap"]//@href').getall()
             item['top5_rewiews'] = []
-            for idx, elem in enumerate(table):
-                for default_star in self.default_stars:
-                    if default_star in elem:
-                        url_star = default_star
-                url = self.base_url + elem
-                res = yield scrapy.Request(url=url)
-                item['top5_rewiews'].append(
-                    {self.default_stars[url_star]: self.get_review(res)}
-                )
+            if self.with_rewiews:
+                for idx, elem in enumerate(table):
+                    for default_star in self.default_stars:
+                        if default_star in elem:
+                            url_star = default_star
+                    url = self.base_url + elem
+                    res = yield scrapy.Request(url=url)
+                    item['top5_rewiews'].append(
+                        {self.default_stars[url_star]: self.get_review(res)}
+                    )
             yield item
