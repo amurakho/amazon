@@ -149,7 +149,7 @@ class AmazonTop100Spider(scrapy.Spider):
             item['prime'] = response.meta.get('isprime')
             item['keyword'] = response.meta.get('keyword')
             item['reviews'] = response.xpath('//span[@id="acrCustomerReviewText"]/text()').get()
-            item['image'] = response.xpath('//div[@id="imgTagWrapperId"]/img/@data-a-dynamic-image').get()
+            item['image'] = response.xpath('//div[@id="imageBlock_feature_div"]/script').get()
             item['top_100'] = True
             if response.css('.ac-badge-wrapper'):
                 item['is_amazonchoice'] = True

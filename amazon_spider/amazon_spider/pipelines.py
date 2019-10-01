@@ -11,6 +11,8 @@ import json
 from datetime import datetime
 from scrapy.utils.project import get_project_settings
 import re
+import ast
+
 
 class AmazonProductPipeline(ImagesPipeline):
     def process_item(self, item, spider):
@@ -92,8 +94,16 @@ class AmazonProductPipeline(ImagesPipeline):
         return item
 
     def parse_image(self, item):
-        item = dict(json.loads(item))
-        return list(item.keys())[0]
+        start = item.find('[')
+        end = item.find('colorToAsin')
+        item = item[start:end - 1].strip()
+        item = item[:-2].replace('null', ""'None'"")
+        item = ast.literal_eval(item)
+        image = []
+        for elem in item:
+            image.append(elem['hiRes'])
+        return image
+
 
     def parse_desc(self, item):
         item = ''.join(item)
@@ -123,8 +133,9 @@ class AmazonProductPipeline(ImagesPipeline):
         return tmp
 
     def get_media_requests(self, item, info):
-        if item['name'] and info.spider.image_manage != 'link':
-            yield scrapy.Request(item['image'], meta={'item': item})
+        if item['title'] and info.spider.image_manage != 'link':
+            for idx, image_url in enumerate(item['image']):
+                yield scrapy.Request(image_url, meta={'item': item, 'idx': idx})
         else:
             return item
 
@@ -132,9 +143,9 @@ class AmazonProductPipeline(ImagesPipeline):
         for path, image, buf in self.get_images(response, request, info):
             if not response.meta['item']['image']:
                 return
-            name = response.meta['item']['name'].replace('/', '-')
-            file_name = name + '_' + str(response.meta['item']['asin'])
-            path = '{}.jpg'.format(file_name)
+            file_name = response.meta['item']['asin'].replace('/', '-')
+            idx = response.meta.get('idx')
+            path = '{}-{}.jpg'.format(file_name, idx)
             self.store.persist_file(
                 path, buf, info,
                 headers={'Content-Type': 'image/jpeg'})
@@ -224,6 +235,7 @@ class AmazonProductDump(object):
         )
 
     def process_item(self, item, spider):
+        item['image'] = json.dumps(item['image'])
         self.store_db(item)
         return item
 
